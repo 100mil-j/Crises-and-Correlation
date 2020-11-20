@@ -1,0 +1,441 @@
+---
+title: "Crises & Correlation"
+author: "Soumil Jain"
+date: "11/17/2020"
+output: pdf_document
+fontsize: 15pt 
+---
+ABSTRACT
+
+A financial crisis is a period of distress for the financial system and the economy as a whole. But what makes a financial crisis, a crisis? Does it imply the defiance of empirical relationships? Let's have a look.
+
+```{r, include=FALSE}
+library(quantmod)
+library(PerformanceAnalytics)
+library(corrplot)
+library(utils)
+library(ggplot2)
+
+# GOLDAMGBD228NLBM (Gold USD/TROY OUNCE)
+# DCOILWTICO(WTI OIL/BARREL)
+# DGS10(10 YEAR TREASURY CONSTANT MATURITY RATE)
+# VIXCLS (CBOE VIX)
+# DFF (Effective Fed Funds Rate)
+# WILLREITIND (Wilshire US REIT)
+# DAA (Moody's Seasoned Aaa Corporate Bond Yield)
+# DEXJPUS (USD VS JAPANESE YEN)
+# DEXUSUK (USD VS BRITISH POUND)
+# DTB3 (3-Month Treasury Bill: Secondary Market Rate)
+
+a <- c("GOLDAMGBD228NLBM","DCOILWTICO","DGS10","VIXCLS","DFF","WILLREITIND","DAAA","DEXJPUS","DEXUSUK","DTB3")
+getSymbols(a,src="FRED",auto.assign=TRUE)
+
+getSymbols("^GSPC", src = "yahoo",
+           from = as.Date("1960-01-04"), to = Sys.Date())
+
+data <- merge(GSPC$GSPC.Adjusted,GOLDAMGBD228NLBM,DAAA,DGS10,DCOILWTICO,VIXCLS,DFF,WILLREITIND,DEXJPUS,DEXUSUK)
+data <- na.omit(data)
+
+names(data)[names(data) == "GOLDAMGBD228NLBM"]    <- "Gold"
+names(data)[names(data) == "DCOILWTICO"]          <- "Oil"
+names(data)[names(data) == "DGS10"]               <- "TBonds"
+names(data)[names(data) == "VIXCLS"]              <- "VIX"
+names(data)[names(data) == "DFF"]                 <- "FFR"
+names(data)[names(data) == "WILLREITIND"]         <- "REIT"
+names(data)[names(data) == "DAAA"]                <- "Bonds"
+names(data)[names(data) == "DEXJPUS"]             <- "JPvUS"
+names(data)[names(data) == "DEXUSUK"]             <- "USvUK"
+names(data)[names(data) == "GSPC.Adjusted"]       <- "Equity"
+
+change <- CalculateReturns(data, method = c("discrete"))
+change <- change[-1,]
+change <- na.omit(change)
+change <- as.data.frame(change)
+```
+                               
+The data used in this study has been scraped from the FRED Database (by the Federal Reserve) using the Quantmod package in R. The following datasets have been extracted from FRED:
+
+GOLDAMGBD228NLBM (Gold USD/Troy Ounce)  
+
+DCOILWTICO (WTI Oil/Barrel)  
+
+DGS10 (10 Year Treasury Constant Maturity Rate)  
+
+VIXCLS (CBOE VIX)  
+
+DFF (Effective Fed Funds Rate)  
+
+WILLREITIND (Wilshire US REIT)  
+
+DAA (Moody's Seasoned Aaa Corporate Bond Yield)  
+
+DEXJPUS (Japanese Yen vs USD)  
+
+DEXUSUK (USD VS BRITISH POUND)  
+
+DTB3 (3-Month Treasury Bill: Secondary Market Rate)  
+
+
+Besides, data for S&P 500 has been extracted from Yahoo Finance using the same package.
+
+```{r, include=FALSE}
+geplot <- plot(data$Equity,
+     type="l",
+     col="darkblue",
+     xlab="Daily",
+     ylab="Prices",
+     main="Historical S&P 500 & Gold Prices",
+     bg="lightblue",
+     grid.col=NA,
+     yaxis.right = FALSE,
+     lwd=0.7,
+    ylim= c(100,4000))
+     lines(data$Gold,
+      type="l",
+      col="red",
+      lwd=1.5)
+     addLegend("topleft", on=1, 
+          legend.names = c("S&P 500", "Gold"), 
+          lty=c(1, 1), lwd=c(2, 2),
+          col=c("darkblue", "red"))
+```
+
+
+
+```{r, echo=FALSE}
+plot(geplot) 
+```
+  
+  
+The following time series graph plots the Historical S&P 500 (Equities) and Gold Prices. Both of these asset classes have given phenomenal compounded returns over the years. 
+  
+Gold prices mentioned here is the USD price per troy ounce of Gold.   
+  
+```{r, echo=FALSE,message=FALSE}
+     ggplot(change, aes(Gold, Equity))+
+     geom_point(size = 2)+
+     theme(
+     panel.background = element_rect(fill = "lightblue"),panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+     ggtitle("Historical Gold and Equity Daily Returns")+  
+     xlab("Change in Gold")+
+     ylab("Change in Equity")+
+     geom_smooth(method=lm,
+                 linetype="dashed",
+                 color="blue",
+                 fill="lightblue")
+```
+
+The plot above maps Gold daily changes on the y-axis and S&P 500 daily changes on the x-axis. The line of best fit indicates of a near 0 relationship between these variables.
+
+```{r, include=FALSE}
+yields<- merge(DAAA,DTB3,DGS10)
+yields<- na.omit(yields)
+yieldschange <- CalculateReturns(yields)
+yieldschange <- na.omit(yieldschange)
+
+yield <- plot(yields$DAAA,
+               type="l",
+               col="darkblue",
+               xlab="Daily",
+               ylab="Yield",
+               main="Historical Bond Yields",
+               bg="lightblue",
+               grid.col=NA,
+               yaxis.right = FALSE,
+               ylim=c(0.0000000001,15),
+               lwd=0.7)
+              lines(yields$DGS10,
+               type="l",
+               col="black",
+               lwd=1)
+              lines(yields$DTB3,
+               type="l",
+               col="maroon",
+               lwd=1)
+               addLegend("topright", on=1, 
+               legend.names = c("Moody's Seasoned Aaa Corporate Bond Yield", "10 Year Treasury Constant Maturity Rate","3-Month Treasury Bill: Secondary Market Rate"), 
+               lty=c(1, 1), lwd=c(2, 2),
+               col=c("darkblue","black","maroon"))
+```
+
+
+```{r, echo=FALSE}
+plot(yield)
+```
+
+The chart above plots the Yields Corporate Bonds, Long Term Treasuries and Short Term Government Securities.
+
+The yield of a Fixed income security is rate of interest with the respect to the market value. This is slightly different from the Coupon rate which is the rate of interest with respect to the Face Value.
+
+Moody's Seasoned Aaa Corporate Bond Yield has been used as a gauge Corporate Bond Yields. The 10 Year Bonds and the 3 month Bills issued by the U.S. Treasury have been used to measure the Long term and Short term Treasury Yields respectively.
+
+The graph clearly points out towards the decreasing tendency of Bond yields over the years.
+
+```{r, echo=FALSE,message=FALSE}
+     ggplot(yieldschange, aes(DGS10, DAAA))+
+     geom_point(size = 2)+
+     theme(
+     panel.background = element_rect(fill = "lightblue"),panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+     ggtitle("Historical Changes in Corporate Bond Yields and 10-Yr Treasury Yields")+  
+     xlab("Change in Corporate Bond Yields")+
+     ylab("Change in Treasury Bond Yields")+
+     geom_smooth(method=lm,
+                 linetype="dashed",
+                 color="blue",
+                 fill="lightblue")
+```
+
+This scatterplot marks the Daily Percentage changes in 10 Year Treasuries on the y-axis and the Corporate Bond Yield on the x-axis.
+
+The dashed dark blue line is the line of best fit (y~x) between the two variables. It clearly reflects of a positive relationship between these rates.
+
+```{r, include=FALSE}
+spread <- plot(yields$DAAA-yields$DGS10,
+               type="l",
+               col="red",
+               xlab="Daily",
+               ylab="Spread",
+               main="Historical Spread",
+               bg="lightblue",
+               grid.col=NA,
+               yaxis.right = FALSE,
+               ylim=c(-2,10),
+               lwd = 0.7)
+              lines(yields$DGS10-yields$DTB3,
+               type="l",
+               col="black",
+               lwd=1)
+              lines(yields$DAAA-yields$DTB3,
+               type="l",
+               col="maroon",
+               lwd=1)
+               addLegend("topright", on=1, 
+               legend.names = c("Cororate Bonds vs 10 Year Treasuries", "10 Year Treasuries vs 3-Month TBills","Corporate Bonds vs 3-Month TBills"), 
+               lty=c(1, 1), lwd=c(2, 2),
+               col=c("red","black","maroon"))
+```
+
+```{r, echo=FALSE}
+plot(spread)
+```
+
+Spread implies the difference between the Interest Rates. The chart here plots spreads as mentioned in the Legend. Historically, this heirarchy of is spotted in the yields:  
+  
+Corporate > TBonds > Tbills  
+
+It must be noted that a flip in the TBonds and TBills, as seen around 2000-01, 2007-08 and 2019, is an indication of an upcoming financial turmoil. The 2000-01 inverse was followed by the dot com bubble, the 2007-08 by the Global Financial Crisis and the 2019 one by the Covid crisis. But wait, how could have the markets predicted this crisis that emerged out of a pandemic? Guess, we'll never know!
+
+```{r, include=FALSE}
+oilplot <- plot(DCOILWTICO,
+              type="l",
+              col="darkblue",
+              xlab="Daily",
+              ylab="Price",
+              main="Historical Crude Oil Prices",
+              bg="lightblue",
+              grid.col=NA,
+              yaxis.right = FALSE,
+              lwd=0.7)
+```
+
+```{r, echo=FALSE}
+plot(oilplot)
+```
+
+The chart here plots the historical Western Texas Intermidiate (wTI) Crude Oil Spot Rates per Barrel. There has been great fluctuation in oil prices over the years. 
+
+Note that the Oil Prices went to negative USD 38 during the Covid Pandemic. Technically, the buyer was buying paid USD 38 for buying a barrel of Oil. Crazy things happen during crises!
+
+
+```{r, include=FALSE}
+VIXplot <- plot(VIXCLS,
+                type="l",
+                col="red",
+                main="Historical VIX",
+                bg="lightblue",
+                grid.col=NA,
+                yaxis.right = FALSE,
+                lwd=0.7)
+```
+
+```{r, echo=FALSE}
+plot(VIXplot)
+```
+
+VIX is an indication for the Volatility in the financial markets. Historically, volatility has seen to rise to extraordinary levels during crises. As seen in the chart, the VIX score tops during GFC 2007-09 and during COVID 2020.
+
+```{r, include=FALSE}
+REITplot <- plot(data$REIT,
+                type="l",
+                col="black",
+                xlab="Daily",
+                ylab="Wilshire US REIT",
+                main="Historical Real Estate Prices",
+                bg="lightblue",
+                grid.col=NA,
+                yaxis.left= FALSE,
+                lwd=0.7,
+                ylim=c(-1000,13000))
+```
+
+```{r, echo=FALSE}
+plot(REITplot)
+```
+
+The chart above plots the Willshire US REIT market value over time. A Real Estate Investment Trust , or REIT, is a company that owns, and in most cases operates, income-producing real estate. REITs own many types of commercial real estate, ranging from office and apartment buildings to warehouses, hospitals, shopping centers, hotels and commercial forests.
+
+The GFC 2007-08 was triggered due to the Sub-prime Mortgage crises. As seen in the graph, Real estate prices in the US soared to extraordinary levels which couldn't be sustained for long and thus, proved to be a bubble.
+
+```{r, include=FALSE}
+DEXJPUSplot <- plot(na.omit(DEXJPUS),
+                 type="l",
+                 col="black",
+                 xlab="Daily",
+                 ylab="Rate",
+                 main="Japanese Yen vs US Dollar",
+                 bg="lightblue",
+                 grid.col=NA,
+                 yaxis.left= FALSE,
+                 lwd=0.7)
+```
+
+```{r, echo=FALSE}
+plot(DEXJPUSplot)
+```
+
+This chart plots the exchange rate between Japanese Yen and the US Dollar. The Japanese Yen has appraciated vis-a-vis US Dollar over the years. Back in 1970s, it would require 350 odd units of Yen to acquire a US dollar. However, as per the present conversion rate, it cost only about 100 JPY to buy a dollar.
+
+```{r, include=FALSE}
+DEXUSUKplot <- plot(na.omit(DEXUSUK),
+                    type="l",
+                    col="black",
+                    xlab="Daily",
+                    ylab="Rate",
+                    main="US Dollar vs British Pound",
+                    bg="lightblue",
+                    grid.col=NA,
+                    yaxis.left= FALSE,
+                    lwd=0.7)
+```
+
+```{r, echo=FALSE,message=FALSE}
+plot(DEXUSUKplot)
+```
+
+The above graph plots the exchange rate between the US Dollar and the British Pound. AS opposed to the earlier series, this one shows the amount of USD required to acquire one pound. And clearly, the US Dollar has grown in value relative to the British Pound.
+
+```{r, echo=FALSE,message=FALSE}
+ggplot(change, aes(JPvUS, USvUK))+
+     geom_point(size = 2)+
+     theme(
+     panel.background = element_rect(fill = "lightblue"),panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+     ggtitle("Changes in Exchange Rates")+  
+     xlab("Change in Yen vs USD")+
+     ylab("Change in USD vs British Pound")+
+     geom_smooth(method=lm,
+                 linetype="dashed",
+                 color="blue",
+                 fill="lightblue")
+
+```
+
+This scatterplot plots the changes in the two foreign exchange rates - JPY vs USD and USD vs UK.
+
+Running a regression and plotting the line of best fit, indicates an imperfect negative correlation between the two exchange rates, which is absolutely understandable, keeping in mind the fact that the first rate is JPY vs USD and not USD vs JPY.
+  
+
+```{r, echo=FALSE}
+
+table.Arbitrary(change[-c(5:10)], metrics=c("mean","sd","DownsideDeviation","min","max","skewness"), metricsNames = c("Average Change","Std. Dev. of Change","Downside Deviation","Minimum Change","Maximum Change","Skewness"))
+```
+
+The above table presents some summary statistics of a few asset classes discussed in this project earlier.
+
+```{r, echo=FALSE}
+
+corrplot.mixed(cor(change),lower.col = "blue",tl.cex = 0.7,number.cex=0.75, title="Historical Relationships",mar=c(0,0,1,0))
+```
+
+The correlogram visualizes a correlation matrix of correlations between the daily changes in various asset classes and financial parameters. 
+
+Some important things to note:  
+  
+1) Gold and Equities exhibit a near zero negative correlation.  
+2) There is a highly positive correlation between Corporate and Government Bond Yields.  
+3) Real Estate and Equity returns portray a significant positive correlation.  
+4) VIX and Equity (or Real Estate) exhibit a strong negative relationship.  
+5) Equity Returns and Bond Yields exhibit a strong positive correlation.  
+6) A significant negative correlation between the two exchange rates.  
+
+Note : The FFR mentioned here is the Effective Federal Funds Rate.  
+
+Having looked at the empirical relationships, let's move on to specific crises periods.
+
+
+```{r, echo=FALSE}
+
+gfc <- data['2007-07-01/2009-06-31']
+
+gfcchange <- CalculateReturns(gfc, method = c("discrete"))
+gfcchange <- gfcchange[-1,]
+gfcchange <- as.data.frame(gfcchange)
+
+corrplot.mixed(cor(gfcchange),lower.col = "blue",tl.cex = 0.7,number.cex=0.75,title="Global Financial Crisis",mar=c(0,0,1,0))
+
+```
+
+This correlogram visualizes correlations during the period of Global Financial Crisis (1st July, 2007 to 31st June, 2009).  
+
+Some differences can be spotted in this visualization as compared to the Historical Correlations one. A generalist interpretation is the strengthening of already existing relationships.  
+
+Some important points to note:  
+
+1) The correlation between Gold and Equity turns to 0.02 as oposed to the historical -0.04.  
+2) The correlation between the two exchange rate weakens.  
+3) The relationship between Equity returns and exchange rates deepens.  
+4) A slightly positive correlation develops between Treasury yields and the the USD vs Pound exchange rate.  
+
+
+```{r, echo=FALSE}
+covid <- data['2020-02-01/2020-11-14']
+
+covidchange <- CalculateReturns(covid, method = c("discrete"))
+covidchange <- covidchange[-1,]
+covidchange <- as.data.frame(covidchange)
+
+corrplot.mixed(cor(covidchange),lower.col = "blue",tl.cex = 0.7,number.cex=0.75,title="Correlation during COVID",mar=c(0,0,1,0))
+```
+
+The economic and financial implications of the COVID-19 pandemic are huge. GDP contractions have reached record levels, with the possibility of a global recession lurking over the world economy. This correlation matrix summarizes correlations between various asset classes and financial parameters. Major discripancies can be reflected in just one glance. Some are summed up here:
+
+1) The correlation between Real Estate and Equity returns jumps to very high levels of 0.87.  
+2) The emergence of a strong positive correlation between the Fed Funds Rate and Equities.  
+3) The negative correlation between the two exchange rates deepens further.  
+4) High positive correlation between Real Estate returns and the USD vs Pound Exchange rate.  
+
+
+
+
+```{R, echo=FALSE,message=FALSE}
+ggplot(covidchange, aes(Gold, Equity))+
+     geom_point(size = 2)+
+     theme(
+     panel.background = element_rect(fill = "lightblue"),panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+     ggtitle("Gold and Equity Daily Returns during COVID Crisis")+  
+     xlab("Change in Gold")+
+     ylab("Change in Equity")+
+     geom_smooth(method=lm,
+                 linetype="dashed",
+                 color="blue",
+                 fill="lightblue")
+```
+
+And one of the most unique attributes of this economic crises brought along by the Covid-19 Pandemic, is the unidirectional movement between Equities and Gold. THis scatter plot exhibits a positive relation between the two asset classes.  
+
+Historical Correlation = -0.02  
+
+Correlation during GFC = 0.02   
+
+Correlation during Covid = 0.2  
+
+Everything is fair in love, war and crisis! Prices of real assets can drop to sub-zero levels and asset classes can defy all empirical relationships.
